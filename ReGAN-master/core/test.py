@@ -132,14 +132,14 @@ def save_images(base, current_step):
 	with torch.no_grad():
 		fixed_fake_ir_masks = base.G_rgb2ir(base.fixed_real_rgb_images).detach()
 		## with threshold
-		# fixed_fake_ir_images = torch.mul(base.fixed_real_rgb_images, fixed_fake_ir_masks)
-		# fixed_fake_ir_images = torch.where(fixed_fake_ir_images >= -1.0, fixed_fake_ir_images, torch.full_like(fixed_fake_ir_images, -1.0))
-		# fixed_fake_ir_images = torch.where(fixed_fake_ir_images <= 1.0, fixed_fake_ir_images, torch.full_like(fixed_fake_ir_images, 1.0))
+		fixed_fake_ir_images = torch.mul(base.fixed_real_rgb_images, fixed_fake_ir_masks)
+		fixed_fake_ir_images = torch.where(fixed_fake_ir_images >= -1.0, fixed_fake_ir_images, torch.full_like(fixed_fake_ir_images, -1.0))
+		fixed_fake_ir_images = torch.where(fixed_fake_ir_images <= 1.0, fixed_fake_ir_images, torch.full_like(fixed_fake_ir_images, 1.0))
 
 		## with tanh
-		fixed_fake_ir_images = torch.mul(base.fixed_real_rgb_images, fixed_fake_ir_masks)
-		map_2_tanh = torch.nn.Tanh()
-		fixed_fake_ir_images = map_2_tanh(fixed_fake_ir_images)
+		# fixed_fake_ir_images = torch.mul(base.fixed_real_rgb_images, fixed_fake_ir_masks)
+		# map_2_tanh = torch.nn.Tanh()
+		# fixed_fake_ir_images = map_2_tanh(fixed_fake_ir_images)
 
 
 		xxxx = torch.cat([base.fixed_real_rgb_images, fixed_fake_ir_images, base.fixed_real_ir_images], dim=0)
