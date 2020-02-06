@@ -160,11 +160,11 @@ def warmup_pixel_module_an_iter(config, base, loaders):
 	map_tanh = torch.nn.Tanh()
 
 	fake_rgb_masks_id = base.G_ir2rgb(real_rgb_images)
-	fake_rgb_images_id = torch.mul(fake_rgb_masks_id, real_ir_images)
+	fake_rgb_images_id = torch.mul(fake_rgb_masks_id, real_rgb_images)
 	fake_rgb_images_id = map_tanh(fake_rgb_images_id)
 
 	fake_ir_masks_id = base.G_rgb2ir(real_ir_images)
-	fake_ir_images_id = torch.mul(fake_ir_masks_id, real_rgb_images)
+	fake_ir_images_id = torch.mul(fake_ir_masks_id, real_ir_images)
 	fake_ir_images_id = map_tanh(fake_ir_images_id)
 
 	identity_loss_rgb = base.criterion_gan_identity(fake_rgb_images_id, real_rgb_images)
