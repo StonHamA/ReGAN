@@ -93,19 +93,20 @@ def main(config):
 
 
 			# warm up the feature alignment module
-			if current_step < config.warmup_feature_module_steps:
-				logger('**********' * 3 + 'warmup the feature module' + '**********' * 3)
-				results_names, resluts_values = warmup_feature_module_a_step(config, base, loaders)
-				logger('Time: {};  Step: {};  {}'.format(time_now(), current_step, analyze_names_and_meter(results_names, resluts_values)))
-				logger('')
-
-			# warm up the pixel alignment module
-			elif current_step < config.warmup_feature_module_steps + config.warmup_pixel_module_steps:
+			if current_step < config.warmup_pixel_module_steps:
 				# save fake images
 				save_images(base, current_step)
 				# warm up
 				logger('**********' * 3 + 'warmup the pixel module' + '**********' * 3)
 				results_names, resluts_values = warmup_pixel_module_a_step(config, base, loaders)
+				logger('Time: {};  Step: {};  {}'.format(time_now(), current_step, analyze_names_and_meter(results_names, resluts_values)))
+				logger('')
+
+
+			# warm up the pixel alignment module
+			elif current_step < config.warmup_feature_module_steps + config.warmup_pixel_module_steps:
+				logger('**********' * 3 + 'warmup the feature module' + '**********' * 3)
+				results_names, resluts_values = warmup_feature_module_a_step(config, base, loaders)
 				logger('Time: {};  Step: {};  {}'.format(time_now(), current_step, analyze_names_and_meter(results_names, resluts_values)))
 				logger('')
 
@@ -180,7 +181,7 @@ if __name__ == '__main__':
 	parser.add_argument('--base_feature_ide_learning_rate', type=float, default=0.2, help='learning rate for feature alignment module')
 
 	# training configuration
-	parser.add_argument('--warmup_feature_module_steps', type=int, default=1)
+	parser.add_argument('--warmup_feature_module_steps', type=int, default=100)
 	parser.add_argument('--warmup_pixel_module_steps', type=int, default=100)
 	parser.add_argument('--joint_training_steps', type=int, default=100)
 
