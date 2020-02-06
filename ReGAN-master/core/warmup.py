@@ -113,36 +113,36 @@ def warmup_pixel_module_an_iter(config, base, loaders):
 	gan_loss = (gan_loss_rgb + gan_loss_ir) / 2.0
 
 	## cycle loss
+	# fake_rgb_masks_cyc = base.G_ir2rgb(fake_ir_images)
+	# fake_rgb_images_cyc = torch.mul(fake_rgb_masks_cyc, fake_ir_images)
+	# fake_rgb_images_cyc = torch.where(fake_rgb_images_cyc <=  1.0, fake_rgb_images_cyc, torch.full_like(fake_rgb_images_cyc, 1.0))
+	# fake_rgb_images_cyc = torch.where(fake_rgb_images_cyc >= -1.0, fake_rgb_images_cyc, torch.full_like(fake_rgb_images_cyc, -1.0))
+	#
 	# fake_ir_masks_cyc = base.G_rgb2ir(fake_rgb_images)
 	# fake_ir_images_cyc = torch.mul(fake_ir_masks_cyc, fake_rgb_images)
 	# fake_ir_images_cyc = torch.where(fake_ir_images_cyc <= 1.0, fake_ir_images_cyc, torch.full_like(fake_ir_images_cyc, 1.0))
 	# fake_ir_images_cyc = torch.where(fake_ir_images_cyc >= -1.0, fake_ir_images_cyc, torch.full_like(fake_ir_images_cyc, -1.0))
 	#
-	# fake_rgb_masks_cyc = base.G_ir2rgb(fake_ir_images)
-	# fake_rgb_images_cyc = torch.mul(fake_rgb_masks_cyc, fake_ir_images)
-	# fake_rgb_images_cyc = torch.where(fake_rgb_images_cyc <=  1.0, fake_rgb_images_cyc, torch.full_like(fake_rgb_images_cyc, 1.0))
-	# fake_rgb_images_cyc = torch.where(fake_rgb_images_cyc >= -1.0, fake_rgb_images_cyc, torch.full_like(fake_rgb_images_cyc, -1.0))
-
 
 	##Tanh
 	map_tanh = torch.nn.Tanh()
-	fake_ir_masks_cyc = base.G_rgb2ir(fake_rgb_images)
-	fake_ir_images_cyc = torch.mul(fake_ir_masks_cyc, fake_rgb_images)
-	fake_ir_images_cyc = map_tanh(fake_ir_images_cyc)
-
 
 	fake_rgb_masks_cyc = base.G_ir2rgb(fake_ir_images)
 	fake_rgb_images_cyc = torch.mul(fake_rgb_masks_cyc, fake_ir_images)
 	fake_rgb_images_cyc = map_tanh(fake_rgb_images_cyc)
 
-	cycle_loss_rgb = base.criterion_gan_cycle(fake_ir_images_cyc, real_rgb_images)
-	cycle_loss_ir = base.criterion_gan_cycle(fake_rgb_images_cyc, real_ir_images)
+	fake_ir_masks_cyc = base.G_rgb2ir(fake_rgb_images)
+	fake_ir_images_cyc = torch.mul(fake_ir_masks_cyc, fake_rgb_images)
+	fake_ir_images_cyc = map_tanh(fake_ir_images_cyc)
+
+	cycle_loss_rgb = base.criterion_gan_cycle(fake_rgb_images_cyc, real_rgb_images)
+	cycle_loss_ir = base.criterion_gan_cycle(fake_ir_images_cyc, real_ir_images)
 	cycle_loss = (cycle_loss_rgb + cycle_loss_ir) / 2.0
 
 	## idnetity loss
 	## Threshold
-	# fake_rgb_masks_id = base.G_ir2rgb(real_ir_images)
-	# fake_ir_masks_id = base.G_rgb2ir(real_rgb_images)
+	# fake_rgb_masks_id = base.G_ir2rgb(real_rgb_images)
+	# fake_ir_masks_id = base.G_rgb2ir(real_ir_images)
 	#
 	# fake_rgb_images_id = torch.mul(fake_rgb_masks_id, real_ir_images)
 	# fake_rgb_images_id = torch.where(fake_rgb_images_id <=  1.0, fake_rgb_images_id,
@@ -157,16 +157,15 @@ def warmup_pixel_module_an_iter(config, base, loaders):
 	# 								torch.full_like(fake_ir_images_id, -1.0))
 
 	##Tanh
-	# map_tanh = torch.nn.Tanh()
-	fake_ir_masks_id = base.G_rgb2ir(real_rgb_images)
-	fake_ir_images_id = torch.mul(fake_ir_masks_id, real_rgb_images)
-	fake_ir_images_id = map_tanh(fake_ir_images_id)
+	map_tanh = torch.nn.Tanh()
 
-
-	fake_rgb_masks_id = base.G_ir2rgb(real_ir_images)
+	fake_rgb_masks_id = base.G_ir2rgb(real_rgb_images)
 	fake_rgb_images_id = torch.mul(fake_rgb_masks_id, real_ir_images)
 	fake_rgb_images_id = map_tanh(fake_rgb_images_id)
 
+	fake_ir_masks_id = base.G_rgb2ir(real_ir_images)
+	fake_ir_images_id = torch.mul(fake_ir_masks_id, real_rgb_images)
+	fake_ir_images_id = map_tanh(fake_ir_images_id)
 
 	identity_loss_rgb = base.criterion_gan_identity(fake_rgb_images_id, real_rgb_images)
 	identity_loss_ir = base.criterion_gan_identity(fake_ir_images_id, real_ir_images)

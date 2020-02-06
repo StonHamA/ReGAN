@@ -117,11 +117,11 @@ def train_pixel_module_a_iter(config, base, loaders):
 	##Tanh
 	map_tanh = torch.nn.Tanh()
 
-	fake_rgb_masks_id = base.G_ir2rgb(real_ir_images)
+	fake_rgb_masks_id = base.G_ir2rgb(real_rgb_images)
 	fake_rgb_images_id = torch.mul(fake_rgb_masks_id, real_ir_images)
 	fake_rgb_images_id = map_tanh(fake_rgb_images_id)
 
-	fake_ir_masks_id = base.G_rgb2ir(real_rgb_images)
+	fake_ir_masks_id = base.G_rgb2ir(real_ir_images)
 	fake_ir_images_id = torch.mul(fake_ir_masks_id, real_rgb_images)
 	fake_ir_images_id = map_tanh(fake_ir_images_id)
 
@@ -201,7 +201,7 @@ def train_feature_module_a_iter(config, base, loaders):
 
 		## fake images
 
-		# fake_ir_masks = base.G_rgb2ir(real_rgb_images)
+		# fake_ir_masks = base.G_rgb2ir(real_rgb_images).detach()
 		# fake_ir_images = torch.mul(fake_ir_masks, real_rgb_images)
 		# fake_ir_images = torch.where(fake_ir_images <= 1.0, fake_ir_images, torch.full_like(fake_ir_images, 1.0))
 		# fake_ir_images = torch.where(fake_ir_images >= -1.0, fake_ir_images, torch.full_like(fake_ir_images, -1.0))
@@ -209,7 +209,7 @@ def train_feature_module_a_iter(config, base, loaders):
 		## fake images (with tanh)
 		map_tanh = torch.nn.Tanh()
 
-		fake_ir_masks = base.G_rgb2ir(real_rgb_images)
+		fake_ir_masks = base.G_rgb2ir(real_rgb_images).detach()
 		fake_ir_images = torch.mul(fake_ir_masks, real_rgb_images)
 		fake_ir_images = map_tanh(fake_ir_images)
 
