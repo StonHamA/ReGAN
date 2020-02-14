@@ -1,13 +1,12 @@
 import os
 import copy
-
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 import itertools
 
-from .model import Generator, Discriminator, ConditionalDiscriminator, weights_init_normal, Encoder, Embeder, Generator_3channels, Generator_3channels2
+from .model import Generator, Discriminator, ConditionalDiscriminator, weights_init_normal, Encoder, Embeder
 from tools import *
 
 
@@ -74,9 +73,9 @@ class Base:
 	def _init_model(self):
 
 		## the pixel alignment module
-		self.G_rgb2ir = Generator(64, 4)
+		self.G_rgb2ir = Generator(64, 3)
 		self.D_ir = ConditionalDiscriminator(64)
-		self.D_ir_warmup = Discriminator(128, 64, 4)
+		self.D_ir_warmup = Discriminator(128, 64, 3)
 
 		self.G_rgb2ir.apply(weights_init_normal)
 		self.D_ir.apply(weights_init_normal)
@@ -86,7 +85,7 @@ class Base:
 		self.D_ir = torch.nn.DataParallel(self.D_ir).to(self.device)
 		self.D_ir_warmup = torch.nn.DataParallel(self.D_ir_warmup).to(self.device)
 
-		self.G_ir2rgb = Generator(64, 4)
+		self.G_ir2rgb = Generator(64, 3)
 		self.D_rgb = Discriminator(128, 64, 4)
 		self.D_rgb_warmup = Discriminator(128, 64, 4)
 
@@ -128,7 +127,7 @@ class Base:
 			self.embeder.load_state_dict(torch.load(self.embeder_restore_path))
 			print('Note: Successfully resume generator from {}'.format(self.embeder_restore_path))
 
-		## we add all models to a list for easy using, such as train, test, save and restore
+		## we add all models to a list for esay using, such as train, test, save and restore
 		self.model_list = []
 		self.model_list.append(self.G_rgb2ir)
 		self.model_list.append(self.G_ir2rgb)
@@ -144,8 +143,8 @@ class Base:
 	def _init_criterions(self):
 		# of the pixel alignment module
 		self.criterion_gan_mse = torch.nn.MSELoss()
-		self.criterion_gan_cycle = torch.nn.L1Loss()
-		self.criterion_gan_identity = torch.nn.L1Loss()
+		self.criterion_gan_cycle = torch.nn.L1Loss()#pytorch_msssim.MSSSIM()#t
+		self.criterion_gan_identity = torch.nn.L1Loss()#pytorch_msssim.MSSSIM()#
 		self.ones = torch.ones([self.config.p_gan*self.config.k_gan, 1, 4, 4]).float().to(self.device)
 		self.zeros = torch.zeros([self.config.p_gan*self.config.k_gan, 1, 4, 4]).float().to(self.device)
 

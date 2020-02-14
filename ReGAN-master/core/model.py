@@ -2,8 +2,6 @@ import torch
 import torch.nn as nn
 import torchvision
 import torch.nn.functional as F
-import numpy as np
-
 
 
 def weights_init_normal(m):
@@ -33,6 +31,56 @@ class ResidualBlock(nn.Module):
         return self.model(x) + x
 
 
+
+
+class Double_conv(nn.Module):
+    def __init__(self, in_channel, out_channel, keep_size=False):
+        super(Double_conv, self).__init__()
+        pad = 1 if keep_size else 0
+        Layer = [
+                 nn.Conv2d(in_channel, out_channel, 3, padding=pad),
+                 nn.InstanceNorm2d(out_channel, affine=True, track_running_stats=True),
+                 nn.ReLU(True),
+                 nn.Conv2d(out_channel, out_channel, 3, padding=pad),
+                 nn.InstanceNorm2d(out_channel, affine=True, track_running_stats=True),
+                 nn.ReLU(True)
+                ]
+        self.dbl = nn.Sequential(*Layer)
+
+    def forward(self, x):
+        return self.dbl(x)
+
+
+class Gen_Encoder(nn.Module):
+
+    def __init__(self, in_channel, out_channel, keep_size=True):
+        super(Gen_Encoder, self).__init__()
+        self.conv = Double_conv(in_channel, out_channel, keep_size)
+        self.pool = nn.MaxPool2d(2, 2)
+
+    def forward(self, x):
+        x = self.pool(x)
+        x = self.conv(x)
+        return x
+
+
+class Gen_Decoder(nn.Module):
+  def __init__(self, in_channels, middle_channels, out_channels):
+    super(Gen_Decoder, self).__init__()
+    self.up = nn.ConvTranspose2d(in_channels, in_channels, kernel_size=2, stride=2)
+    self.AdaIN = nn.InstanceNorm2d(out_channels, affine=True, track_running_stats=True)
+    self.conv_relu = nn.Sequential(
+        nn.Conv2d(middle_channels, out_channels, kernel_size=3, padding=1),
+        nn.ReLU(inplace=True)
+        )
+  def forward(self, x1, x2):
+    x1 = self.up(x1)
+    x1 = torch.cat((x1, x2), dim=1)
+    x1 = self.conv_relu(x1)
+
+    return x1
+
+
 class Generator(nn.Module):
     '''Generator with Down sampling, Several ResBlocks and Up sampling.
        Down/Up Samplings are used for less computation.
@@ -41,204 +89,55 @@ class Generator(nn.Module):
     def __init__(self, conv_dim, layer_num):
         super(Generator, self).__init__()
 
-        layers = []
+        input = []
+        res_block = []
+        output =[]
 
         # input layer
-        layers.append(nn.Conv2d(in_channels=3, out_channels=conv_dim, kernel_size=7, stride=1, padding=3, bias=False))
-        layers.append(nn.InstanceNorm2d(conv_dim, affine=True, track_running_stats=True))
-        layers.append(nn.ReLU(inplace=True))
+        input.append(nn.Conv2d(in_channels=3, out_channels=conv_dim, kernel_size=7, stride=1, padding=3, bias=False))
+        input.append(nn.InstanceNorm2d(conv_dim, affine=True, track_running_stats=True))
+        input.append(nn.ReLU(inplace=True))
 
         # down sampling layers
         current_dims = conv_dim
-        for i in range(2):
-            layers.append(nn.Conv2d(current_dims, current_dims*2, kernel_size=4, stride=2, padding=1, bias=False))
-            layers.append(nn.InstanceNorm2d(current_dims*2, affine=True, track_running_stats=True))
-            layers.append(nn.ReLU(inplace=True))
-            current_dims *= 2
+        self.down_layer1 = Gen_Encoder(current_dims, current_dims*2)
+        self.down_layer2 = Gen_Encoder(current_dims*2, current_dims*4)
+        self.down_layer3 = Gen_Encoder(current_dims*4, current_dims*8)
 
         # Residual Layers
         for i in range(layer_num):
-            layers.append(ResidualBlock(current_dims, current_dims))
+            res_block.append(ResidualBlock(current_dims*8, current_dims*8))
 
         # up sampling layers
-        for i in range(2):
-            layers.append(nn.ConvTranspose2d(current_dims, current_dims//2, kernel_size=4, stride=2, padding=1, bias=False))
-            layers.append(nn.InstanceNorm2d(current_dims//2, affine=True, track_running_stats=True))
-            layers.append(nn.ReLU(inplace=True))
-            current_dims = current_dims//2
+        self.up_layer2 = Gen_Decoder(current_dims*8, current_dims*8 + current_dims*4, current_dims*4)
+        self.up_layer1 = Gen_Decoder(current_dims*4, current_dims*4 + current_dims*2, current_dims*2)
 
         # output layer
-        layers.append(nn.Conv2d(current_dims, 1, kernel_size=7, stride=1, padding=3, bias=False))
-        self.model = nn.Sequential(*layers)
+        output.append(nn.ConvTranspose2d(current_dims*2, current_dims, kernel_size=2, stride=2))
+        output.append(nn.InstanceNorm2d(current_dims, affine=True))
+        output.append(nn.Conv2d(current_dims, 3, kernel_size=7, stride=1, padding=3, bias=False))
+        output.append(nn.Tanh())
+
+        self.input = nn.Sequential(*input)
+        self.res_block = nn.Sequential(*res_block)
+        self.output = nn.Sequential(*output)
 
     def forward(self, x,):
-        output = self.model(x)
-        output = torch.cat((output, output, output), dim=1)
-        return output
-
-
-
-
-class Generator_3channels(nn.Module):
-    '''Generator with Down sampling, Several ResBlocks and Up sampling.
-       Down/Up Samplings are used for less computation.
-    '''
-
-    def __init__(self, conv_dim, layer_num):
-        super(Generator_3channels, self).__init__()
-
-        layers = []
-        input_image = []
-        output_layer = []
-        output_layer_R = []
-        output_layer_G = []
-        output_layer_B = []
-
-        #imput image (raw)
-        input_image.append(nn.Conv2d(in_channels=3, out_channels=3, kernel_size=1, stride=1, padding=0, bias=False))
-        # input_image.append(nn.BatchNorm2d(3, affine=True, track_running_stats=True))
-        # input_image.append(nn.InstanceNorm2d(3, affine=True, track_running_stats=True))
-
-
-
-        # input layer
-        layers.append(nn.Conv2d(in_channels=3, out_channels=conv_dim, kernel_size=7, stride=1, padding=3, bias=False))
-        layers.append(nn.InstanceNorm2d(conv_dim, affine=True, track_running_stats=True))
-        layers.append(nn.ReLU(inplace=True))
-
-        # down sampling layers
-        current_dims = conv_dim
-        for i in range(2):
-            layers.append(nn.Conv2d(current_dims, current_dims*2, kernel_size=4, stride=2, padding=1, bias=False))
-            layers.append(nn.InstanceNorm2d(current_dims*2, affine=True, track_running_stats=True))
-            layers.append(nn.ReLU(inplace=True))
-            current_dims *= 2
-
-        # Residual Layers
-        for i in range(layer_num):
-            layers.append(ResidualBlock(current_dims, current_dims))
-
-        # up sampling layers
-        for i in range(2):
-            layers.append(nn.ConvTranspose2d(current_dims, current_dims//2, kernel_size=4, stride=2, padding=1, bias=False))
-            layers.append(nn.InstanceNorm2d(current_dims//2, affine=True, track_running_stats=True))
-            layers.append(nn.ReLU(inplace=True))
-            current_dims = current_dims//2
-
-        # output layer (mask)
-        # layers.append(nn.Conv2d(current_dims, 3, kernel_size=7, stride=1, padding=3, bias=False))
-        # layers.append(nn.Tanh())
-
-        # # output layer
-        output_layer_R.append(nn.Conv2d(current_dims, 1, kernel_size=7, stride=1, padding=3, bias=False))
-        output_layer_R.append(nn.Tanh())
-        # output_layer_R.append(nn.InstanceNorm2d(1, affine=True, track_running_stats=True))
-
-        output_layer_G.append(nn.Conv2d(current_dims, 1, kernel_size=7, stride=1, padding=3, bias=False))
-        output_layer_G.append(nn.Tanh())
-        # output_layer_G.append(nn.InstanceNorm2d(1, affine=True, track_running_stats=True))
-
-        output_layer_B.append(nn.Conv2d(current_dims, 1, kernel_size=7, stride=1, padding=3, bias=False))
-        output_layer_B.append(nn.Tanh())
-        # output_layer_B.append(nn.InstanceNorm2d(1, affine=True, track_running_stats=True))
-
-        # todo: gen输出0-1数值。
-        self.model = nn.Sequential(*layers)
-        # self.output_mask = nn.Sequential(*output_layer)
-        self.image_in = nn.Sequential(*input_image)
-        self.output_R = nn.Sequential(*output_layer_R)
-        self.output_G = nn.Sequential(*output_layer_G)
-        self.output_B = nn.Sequential(*output_layer_B)
-
-
-
-    def forward(self, x,):
-        raw_normed = []
-        image_raw = x
-        Norm = torchvision.transforms.Normalize(mean=[1.0, 1.0, 1.0], std=[0.1, 0.1, 0.1])
-
-        for steps in image_raw:
-            steps = Norm(steps)
-            raw_normed.append(steps)
-        image_raw = torch.stack(raw_normed,dim=0)
-
-        x = self.model(x)
-        mask_r = self.output_R(x)
-        mask_g = self.output_G(x)
-        mask_b = self.output_B(x)
-        #
-        mask_rgb_before = torch.cat((mask_r,mask_g,mask_b),dim=1)
-        # mask_sum = torch.sum(mask_rgb_before,dim=1,keepdim=True)
-        # # # all_mask_1 = torch.where(mask_sum > 1, torch.full_like(mask_sum, 0.9), torch.full_like(mask_sum, 1.0))
-        # #
-        # eliminate_below_zero = torch.where(mask_sum < 0, torch.full_like(mask_sum, 1.0), torch.full_like(mask_sum, 1.0))
-        # #
-        # # mask_r = torch.mul(mask_r, all_mask_1)
-        # mask_r = torch.mul(mask_r, eliminate_below_zero)
-        #
-        # # mask_g = torch.mul(mask_g, all_mask_1)
-        # mask_g = torch.mul(mask_g, eliminate_below_zero)
-        #
-        # # mask_b = torch.mul(mask_b, all_mask_1)
-        # mask_b = torch.mul(mask_b, eliminate_below_zero)
-        # # mask = torch.mul(x, eliminate_below_zero)
-        #
-        # mask_rgb_fin = torch.cat((mask_r,mask_g,mask_b),dim=1)
-        output = torch.mul(image_raw, mask_rgb_before)
-        # ex = nn.Tanh()
-        # output = ex(output)
-
-        return output
-
-
-class Generator_3channels2(nn.Module):
-    '''Generator with Down sampling, Several ResBlocks and Up sampling.
-       Down/Up Samplings are used for less computation.
-    '''
-
-    def __init__(self, conv_dim, layer_num):
-        super(Generator_3channels2, self).__init__()
-
-
-        layers = []
-
-        # input layer
-        layers.append(nn.Conv2d(in_channels=3, out_channels=conv_dim, kernel_size=7, stride=1, padding=3, bias=False))
-        layers.append(nn.InstanceNorm2d(conv_dim, affine=True, track_running_stats=True))
-        layers.append(nn.ReLU(inplace=True))
-
-        # down sampling layers
-        current_dims = conv_dim
-        for i in range(2):
-            layers.append(nn.Conv2d(current_dims, current_dims*2, kernel_size=4, stride=2, padding=1, bias=False))
-            layers.append(nn.InstanceNorm2d(current_dims*2, affine=True, track_running_stats=True))
-            layers.append(nn.ReLU(inplace=True))
-            current_dims *= 2
-
-        # Residual Layers
-        for i in range(layer_num):
-            layers.append(ResidualBlock(current_dims, current_dims))
-
-        # up sampling layers
-        for i in range(2):
-            layers.append(nn.ConvTranspose2d(current_dims, current_dims//2, kernel_size=4, stride=2, padding=1, bias=False))
-            layers.append(nn.InstanceNorm2d(current_dims//2, affine=True, track_running_stats=True))
-            layers.append(nn.ReLU(inplace=True))
-            current_dims = current_dims//2
-
-        # output layer
-        layers.append(nn.Conv2d(current_dims, 3, kernel_size=7, stride=1, padding=3, bias=False))
-        layers.append(nn.Tanh())
-
-        self.model = nn.Sequential(*layers)
-
-    def forward(self, x,):
-        return self.model(x)
-
-
-
-
-
+        e0 = self.input(x)
+        e1 = self.down_layer1(e0)
+        # print('e1',e1.size())
+        e2 = self.down_layer2(e1)
+        # print('e2',e2.size())
+        e3 = self.down_layer3(e2)
+        # print('e3',e3.size())
+        f = self.res_block(e3)
+        # print('f',f.size())
+        u2 = self.up_layer2(f, e2)
+        # print('u2',u2.size())
+        u1 =self.up_layer1(u2, e1)
+        # print('u1',u1.size())
+        out = self.output(u1)
+        return out
 
 
 class Discriminator(nn.Module):

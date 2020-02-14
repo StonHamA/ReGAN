@@ -38,25 +38,8 @@ def train_pixel_module_a_iter(config, base, loaders):
 	rgb_pids, ir_pids = rgb_pids.to(base.device), ir_pids.to(base.device)
 
 	## fake images
-	# fake_rgb_masks = base.G_ir2rgb(real_ir_images)
-	# fake_rgb_images = torch.mul(fake_rgb_masks, real_ir_images)
-	# fake_rgb_images = torch.where(fake_rgb_images <= 1.0, fake_rgb_images, torch.full_like(fake_rgb_images, 1.0))
-	# fake_rgb_images = torch.where(fake_rgb_images >= -1.0, fake_rgb_images, torch.full_like(fake_rgb_images, -1.0))
-
-	# fake_ir_masks = base.G_rgb2ir(real_rgb_images)
-	# fake_ir_images = torch.mul(fake_ir_masks, real_rgb_images)
-	# fake_ir_images = torch.where(fake_ir_images <= 1.0, fake_ir_images, torch.full_like(fake_ir_images, 1.0))
-	# fake_ir_images = torch.where(fake_ir_images >= -1.0, fake_ir_images, torch.full_like(fake_ir_images, -1.0))
-
-	## fake images (with tanh)
-	map_tanh = torch.nn.Tanh()
-	fake_rgb_masks = base.G_ir2rgb(real_ir_images)
-	fake_rgb_images = torch.mul(fake_rgb_masks, real_ir_images)
-	fake_rgb_images = map_tanh(fake_rgb_images)
-
-	fake_ir_masks = base.G_rgb2ir(real_rgb_images)
-	fake_ir_images = torch.mul(fake_ir_masks, real_rgb_images)
-	fake_ir_images = map_tanh(fake_ir_images)
+	fake_rgb_images = base.G_ir2rgb(real_ir_images)
+	fake_ir_images = base.G_rgb2ir(real_rgb_images)
 
 	## features
 	real_ir_features = base.encoder(base.process_images_4_encoder(real_ir_images, True, True))
@@ -72,61 +55,13 @@ def train_pixel_module_a_iter(config, base, loaders):
 	gan_loss = (gan_loss_rgb + gan_loss_ir) / 2.0
 
 	# cycle loss
-	# fake_ir_masks_cyc = base.G_rgb2ir(fake_rgb_images)
-	# fake_ir_images_cyc = torch.mul(fake_ir_masks_cyc, fake_rgb_images)
-	# fake_ir_images_cyc = torch.where(fake_ir_images_cyc <= 1.0, fake_ir_images_cyc, torch.full_like(fake_ir_images_cyc, 1.0))
-	# fake_ir_images_cyc = torch.where(fake_ir_images_cyc >= -1.0, fake_ir_images_cyc, torch.full_like(fake_ir_images_cyc, -1.0))
-	#
-	# fake_rgb_masks_cyc = base.G_ir2rgb(fake_ir_images)
-	# fake_rgb_images_cyc = torch.mul(fake_rgb_masks_cyc, fake_ir_images)
-	# fake_rgb_images_cyc = torch.where(fake_rgb_images_cyc <=  1.0, fake_rgb_images_cyc, torch.full_like(fake_rgb_images_cyc, 1.0))
-	# fake_rgb_images_cyc = torch.where(fake_rgb_images_cyc >= -1.0, fake_rgb_images_cyc, torch.full_like(fake_rgb_images_cyc, -1.0))
-
-	##Tanh
-	map_tanh = torch.nn.Tanh()
-
-	fake_rgb_masks_cyc = base.G_ir2rgb(fake_ir_images)
-	fake_rgb_images_cyc = torch.mul(fake_rgb_masks_cyc, fake_ir_images)
-	fake_rgb_images_cyc = map_tanh(fake_rgb_images_cyc)
-
-	fake_ir_masks_cyc = base.G_rgb2ir(fake_rgb_images)
-	fake_ir_images_cyc = torch.mul(fake_ir_masks_cyc, fake_rgb_images)
-	fake_ir_images_cyc = map_tanh(fake_ir_images_cyc)
-
-	cycle_loss_rgb = base.criterion_gan_cycle(fake_rgb_images_cyc, real_rgb_images)
-	cycle_loss_ir = base.criterion_gan_cycle(fake_ir_images_cyc, real_ir_images)
+	cycle_loss_rgb = base.criterion_gan_cycle(base.G_ir2rgb(fake_ir_images), real_rgb_images)
+	cycle_loss_ir =  base.criterion_gan_cycle(base.G_rgb2ir(fake_rgb_images), real_ir_images)
 	cycle_loss = (cycle_loss_rgb + cycle_loss_ir) / 2.0
 
 	# idnetity loss
-	## Threshold
-	# fake_rgb_masks_id = base.G_ir2rgb(real_ir_images)
-	# fake_ir_masks_id = base.G_rgb2ir(real_rgb_images)
-	#
-	# fake_rgb_images_id = torch.mul(fake_rgb_masks_id, real_ir_images)
-	# fake_rgb_images_id = torch.where(fake_rgb_images_id <= 1.0, fake_rgb_images_id,
-	# 								 torch.full_like(fake_rgb_images_id, 1.0))
-	# fake_rgb_images_id = torch.where(fake_rgb_images_id >= -1.0, fake_rgb_images_id,
-	# 								 torch.full_like(fake_rgb_images_id, -1.0))
-	#
-	# fake_ir_images_id = torch.mul(fake_ir_masks_id, real_rgb_images)
-	# fake_ir_images_id = torch.where(fake_ir_images_id <= 1.0, fake_ir_images_id,
-	# 								torch.full_like(fake_ir_images_id, 1.0))
-	# fake_ir_images_id = torch.where(fake_ir_images_id >= -1.0, fake_ir_images_id,
-	# 								torch.full_like(fake_ir_images_id, -1.0))
-
-	##Tanh
-	map_tanh = torch.nn.Tanh()
-
-	fake_rgb_masks_id = base.G_ir2rgb(real_rgb_images)
-	fake_rgb_images_id = torch.mul(fake_rgb_masks_id, real_rgb_images)
-	fake_rgb_images_id = map_tanh(fake_rgb_images_id)
-
-	fake_ir_masks_id = base.G_rgb2ir(real_ir_images)
-	fake_ir_images_id = torch.mul(fake_ir_masks_id, real_ir_images)
-	fake_ir_images_id = map_tanh(fake_ir_images_id)
-
-	identity_loss_rgb = base.criterion_gan_identity(fake_rgb_images_id, real_rgb_images)
-	identity_loss_ir = base.criterion_gan_identity(fake_ir_images_id, real_ir_images)
+	identity_loss_rgb =  base.criterion_gan_identity(base.G_ir2rgb(real_rgb_images), real_rgb_images)
+	identity_loss_ir = base.criterion_gan_identity(base.G_rgb2ir(real_ir_images), real_ir_images)
 	identity_loss = (identity_loss_rgb + identity_loss_ir) / 2.0
 
 	## task related loss
@@ -198,23 +133,7 @@ def train_feature_module_a_iter(config, base, loaders):
 	### ide
 	## forward
 	with torch.no_grad():
-
-		## fake images
-
-		# fake_ir_masks = base.G_rgb2ir(real_rgb_images).detach()
-		# fake_ir_images = torch.mul(fake_ir_masks, real_rgb_images)
-		# fake_ir_images = torch.where(fake_ir_images <= 1.0, fake_ir_images, torch.full_like(fake_ir_images, 1.0))
-		# fake_ir_images = torch.where(fake_ir_images >= -1.0, fake_ir_images, torch.full_like(fake_ir_images, -1.0))
-
-		## fake images (with tanh)
-		map_tanh = torch.nn.Tanh()
-
-		fake_ir_masks = base.G_rgb2ir(real_rgb_images).detach()
-		fake_ir_images = torch.mul(fake_ir_masks, real_rgb_images)
-		fake_ir_images = map_tanh(fake_ir_images)
-
-
-
+		fake_ir_images = base.G_rgb2ir(real_rgb_images).detach()
 	fake_ir_features = base.encoder(base.process_images_4_encoder(fake_ir_images, True, True))
 	real_ir_features = base.encoder(base.process_images_4_encoder(real_ir_images, True, True))
 
@@ -232,6 +151,8 @@ def train_feature_module_a_iter(config, base, loaders):
 	loss_rgb2ir_triplet = base.compute_triplet_loss(real_ir_embedding_list, fake_ir_embedding_list,
 	                                                fake_ir_embedding_list, ir_pids, rgb_pids, rgb_pids)
 	loss_triplet = loss_ir2rgb_triplet + loss_rgb2ir_triplet
+
+	# centr
 
 	# gan loss
 	if base.lambda_feature_gan != 0.0:

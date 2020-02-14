@@ -1,6 +1,6 @@
 import os
 import argparse
-import numpy as np
+
 import torchvision.transforms as transforms
 
 from core import *
@@ -23,12 +23,10 @@ def main(config):
 	transform_train = transforms.Compose([
 		transforms.Resize([config.image_size, config.image_size], interpolation=3),
 		transforms.RandomHorizontalFlip(),
-		transforms.Grayscale(num_output_channels=3),
 		transforms.ToTensor(),
 		transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5])])
 	transform_test = transforms.Compose([
 		transforms.Resize([config.image_size, config.image_size], interpolation=3),
-		transforms.Grayscale(num_output_channels=3),
 		transforms.ToTensor(),
 		transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5])])
 	loaders = Loaders(config, transform_train, transform_test)
@@ -81,7 +79,7 @@ def main(config):
 
 			# evaluate reid
 			if current_step in config.evaluate_reid_steps:
-				logger('**********' * 3 + 'evaluate' + '**********' * 3)
+				logger('**********' * 10 + 'evaluate' + '**********' * 10)
 				results = test(config, base, loaders, True)
 				for key in list(results.keys()):
 					logger('Time: {}, {}, {}'.format(time_now(), key, results[key]))
@@ -94,7 +92,7 @@ def main(config):
 
 			# warm up the feature alignment module
 			if current_step < config.warmup_feature_module_steps:
-				logger('**********' * 3 + 'warmup the feature module' + '**********' * 3)
+				logger('**********' * 10 + 'warmup the feature module' + '**********' * 10)
 				results_names, resluts_values = warmup_feature_module_a_step(config, base, loaders)
 				logger('Time: {};  Step: {};  {}'.format(time_now(), current_step, analyze_names_and_meter(results_names, resluts_values)))
 				logger('')
@@ -104,20 +102,20 @@ def main(config):
 				# save fake images
 				save_images(base, current_step)
 				# warm up
-				logger('**********' * 3 + 'warmup the pixel module' + '**********' * 3)
+				logger('**********' * 10 + 'warmup the pixel module' + '**********' * 10)
 				results_names, resluts_values = warmup_pixel_module_a_step(config, base, loaders)
 				logger('Time: {};  Step: {};  {}'.format(time_now(), current_step, analyze_names_and_meter(results_names, resluts_values)))
 				logger('')
 
 			# jointly train the whole model
 			else:
-				logger('**********'*3 + 'train' + '**********'*3 )
+				logger('**********'*10 + 'train' + '**********'*10 )
 				gan_titles, gan_values, ide_titles, ide_values = train_a_step(config, base, loaders, current_step)
 				logger('Time: {};  Step: {};  {}'.format(time_now(), current_step, analyze_names_and_meter(gan_titles, gan_values)))
 				logger('Time: {};  Step: {};  {}'.format(time_now(), current_step, analyze_names_and_meter(ide_titles, ide_values)))
 				logger('')
 
-		logger('**********' * 3 + 'final test' + '**********' * 3)
+		logger('**********' * 10 + 'final test' + '**********' * 10)
 		results = test(config, base, loaders, False)
 		for key in list(results.keys()):
 			logger('Time: {}, {}, {}'.format(time_now(), key, results[key]))
@@ -127,7 +125,7 @@ def main(config):
 	elif config.mode == 'test':
 
 		base.resume_model_from_path(config.pretrained_model_path, config.pretrained_model_index)
-		logger('**********' * 3 + 'test with pre-trained model' + '**********' * 3)
+		logger('**********' * 10 + 'test with pre-trained model' + '**********' * 10)
 		results = test(config, base, loaders, False)
 		for key in list(results.keys()):
 			logger('Time: {}, {}, {}'.format(time_now(), key, results[key]))
@@ -149,7 +147,7 @@ if __name__ == '__main__':
 	parser.add_argument('--dataset_path', type=str, default='SYSU-MM01/')
 	parser.add_argument('--p_gan', type=int, default=4, help='person numbers for pixel alignment module')
 	parser.add_argument('--k_gan', type=int, default=4, help='images numbers of a person for pixel alignment module')
-	parser.add_argument('--p_ide', type=int, default=12, help='person numbers for feature alignment module')
+	parser.add_argument('--p_ide', type=int, default=12,   help='person numbers for feature alignment module')
 	parser.add_argument('--k_ide', type=int, default=4, help='image numbers of a person for feature alignment module')
 	parser.add_argument('--class_num', type=int, default=395, help='identity numbers in training set')
 	parser.add_argument('--image_size', type=int, default=128, help='image size for pixel alignment module,. in feature alignment module, images will be automatically reshaped to 384*192')
@@ -165,8 +163,6 @@ if __name__ == '__main__':
 	# [pixel align part] criterion configuration
 	parser.add_argument('--lambda_pixel_tri', type=float, default=0.1)
 	parser.add_argument('--lambda_pixel_cls', type=float, default=0.1)
-	# parser.add_argument('--lambda_pixel_cls', type=float, default=0.3)
-
 
 	# [feature align part] criterion configuration
 	parser.add_argument('--lambda_feature_cls', type=float, default=1.0)
@@ -180,13 +176,9 @@ if __name__ == '__main__':
 	parser.add_argument('--base_feature_ide_learning_rate', type=float, default=0.2, help='learning rate for feature alignment module')
 
 	# training configuration
-	parser.add_argument('--warmup_feature_module_steps', type=int, default=50)
-	parser.add_argument('--warmup_pixel_module_steps', type=int, default=100)
-	parser.add_argument('--joint_training_steps', type=int, default=100)
-
-	# parser.add_argument('--warmup_feature_module_steps', type=int, default=100)
-	# parser.add_argument('--warmup_pixel_module_steps', type=int, default=200)
-	# parser.add_argument('--joint_training_steps', type=int, default=201)
+	parser.add_argument('--warmup_feature_module_steps', type=int, default=50)#50)
+	parser.add_argument('--warmup_pixel_module_steps', type=int, default=100)#150)
+	parser.add_argument('--joint_training_steps', type=int, default=121)#151)
 	parser.add_argument('--milestones', nargs='+', type=int, default=[50])
 	parser.add_argument('--save_model_steps', nargs='+', type=int, default=[100])
 
