@@ -75,7 +75,7 @@ class Base:
 		## the pixel alignment module
 		self.G_rgb2ir = Generator(64, 3)
 		self.D_ir = ConditionalDiscriminator(64)
-		self.D_ir_warmup = Discriminator(128, 64, 3)
+		self.D_ir_warmup = Discriminator(128, 64, 4)
 
 		self.G_rgb2ir.apply(weights_init_normal)
 		self.D_ir.apply(weights_init_normal)

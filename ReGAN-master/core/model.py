@@ -67,15 +67,15 @@ class Gen_Encoder(nn.Module):
 class Gen_Decoder(nn.Module):
   def __init__(self, in_channels, middle_channels, out_channels):
     super(Gen_Decoder, self).__init__()
-    self.up = nn.ConvTranspose2d(in_channels, in_channels, kernel_size=2, stride=2)
-    self.AdaIN = nn.InstanceNorm2d(out_channels, affine=True, track_running_stats=True)
+    self.up = nn.ConvTranspose2d(middle_channels, middle_channels, kernel_size=2, stride=2)
+    self.AdaIN = nn.InstanceNorm2d(middle_channels, affine=True, track_running_stats=True)
     self.conv_relu = nn.Sequential(
         nn.Conv2d(middle_channels, out_channels, kernel_size=3, padding=1),
         nn.ReLU(inplace=True)
         )
   def forward(self, x1, x2):
-    x1 = self.up(x1)
     x1 = torch.cat((x1, x2), dim=1)
+    x1 = self.up(x1)
     x1 = self.conv_relu(x1)
 
     return x1
@@ -109,12 +109,11 @@ class Generator(nn.Module):
             res_block.append(ResidualBlock(current_dims*8, current_dims*8))
 
         # up sampling layers
-        self.up_layer2 = Gen_Decoder(current_dims*8, current_dims*8 + current_dims*4, current_dims*4)
-        self.up_layer1 = Gen_Decoder(current_dims*4, current_dims*4 + current_dims*2, current_dims*2)
+        self.up_layer3 = Gen_Decoder(current_dims*8, current_dims*8 + current_dims*8, current_dims*4)
+        self.up_layer2 = Gen_Decoder(current_dims*4, current_dims*4 + current_dims*4, current_dims*2)
+        self.up_layer1 = Gen_Decoder(current_dims*2, current_dims*2 + current_dims*2, current_dims)
 
         # output layer
-        output.append(nn.ConvTranspose2d(current_dims*2, current_dims, kernel_size=2, stride=2))
-        output.append(nn.InstanceNorm2d(current_dims, affine=True))
         output.append(nn.Conv2d(current_dims, 3, kernel_size=7, stride=1, padding=3, bias=False))
         output.append(nn.Tanh())
 
@@ -125,17 +124,12 @@ class Generator(nn.Module):
     def forward(self, x,):
         e0 = self.input(x)
         e1 = self.down_layer1(e0)
-        # print('e1',e1.size())
         e2 = self.down_layer2(e1)
-        # print('e2',e2.size())
         e3 = self.down_layer3(e2)
-        # print('e3',e3.size())
         f = self.res_block(e3)
-        # print('f',f.size())
-        u2 = self.up_layer2(f, e2)
-        # print('u2',u2.size())
+        u3 = self.up_layer3(f, e3)
+        u2 = self.up_layer2(u3, e2)
         u1 =self.up_layer1(u2, e1)
-        # print('u1',u1.size())
         out = self.output(u1)
         return out
 

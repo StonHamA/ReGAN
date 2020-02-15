@@ -177,7 +177,7 @@ if __name__ == '__main__':
 
 	# training configuration
 	parser.add_argument('--warmup_feature_module_steps', type=int, default=50)#50)
-	parser.add_argument('--warmup_pixel_module_steps', type=int, default=100)#150)
+	parser.add_argument('--warmup_pixel_module_steps', type=int, default=80)#150)
 	parser.add_argument('--joint_training_steps', type=int, default=121)#151)
 	parser.add_argument('--milestones', nargs='+', type=int, default=[50])
 	parser.add_argument('--save_model_steps', nargs='+', type=int, default=[100])
