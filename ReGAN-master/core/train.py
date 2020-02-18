@@ -134,14 +134,17 @@ def train_feature_module_a_iter(config, base, loaders):
 	## forward
 	with torch.no_grad():
 		fake_ir_images = base.G_rgb2ir(real_rgb_images).detach()
-	fake_ir_features = base.encoder(base.process_images_4_encoder(fake_ir_images, True, True))
-	real_ir_features = base.encoder(base.process_images_4_encoder(real_ir_images, True, True))
+	fake_ir_feature1, fake_ir_feature2, fake_ir_feature3 = base.encoder(base.process_images_4_encoder(fake_ir_images, True, True))
+	real_ir_feature1, real_ir_feature2, real_ir_feature3 = base.encoder(base.process_images_4_encoder(real_ir_images, True, True))
 
-	_, _, fake_ir_logits_list, fake_ir_embedding_list = base.embeder(fake_ir_features)
-	_, _, real_ir_logits_list, real_ir_embedding_list = base.embeder(real_ir_features)
+	fake_ir_logits_list, fake_ir_embedding_list = base.embeder(fake_ir_feature1, fake_ir_feature2, fake_ir_feature3)
+	real_ir_logits_list, real_ir_embedding_list = base.embeder(real_ir_feature1, real_ir_feature2, real_ir_feature3)
 
 	## compute losses
 	# classification loss
+	ir_pids = torch.cat((ir_pids, ir_pids, ir_pids), dim=1)
+	rgb_pids = torch.cat((rgb_pids, rgb_pids, rgb_pids), dim=1)
+
 	fake_ir_acc, loss_fake_ir_cls = base.compute_classification_loss(fake_ir_logits_list, rgb_pids)
 	real_ir_acc, loss_real_ir_cls = base.compute_classification_loss(real_ir_logits_list, ir_pids)
 	loss_cls = loss_fake_ir_cls + loss_real_ir_cls

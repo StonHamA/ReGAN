@@ -21,82 +21,98 @@ def conv1x1(in_planes, out_planes, stride=1):
     """1x1 convolution"""
     return nn.Conv2d(in_planes, out_planes, kernel_size=1, stride=stride, bias=False)
 
-class Bottleneck(nn.Module):
-    expansion = 2
 
-    def __init__(self, inplanes, planes, stride=1, groups=1,
-                 base_width=64, dilation=1, norm_layer=None):
-        super(Bottleneck, self).__init__()
-        if norm_layer is None:
-            norm_layer = nn.BatchNorm2d
-        width = int(planes * (base_width / 64.)) * groups
-        # Both self.conv2 and self.downsample layers downsample the input when stride != 1
-        self.conv1 = conv1x1(inplanes, width)
-        self.bn1 = norm_layer(width)
-        self.conv2 = conv3x3(width, width, stride, groups, dilation)
-        self.bn2 = norm_layer(width)
-        self.conv3 = conv1x1(width, planes * self.expansion)
-        self.bn3 = norm_layer(planes * self.expansion)
-        self.relu = nn.ReLU(inplace=True)
-        self.stride = stride
+class PyramidClassifier(nn.Module):
+    def __init__(self, num_classes):
+        super(PyramidClassifier,self).__init__()
+        self.num_classes = num_classes
+        self.averagepool= nn.AdaptiveAvgPool2d(output_size=(1,1))
 
-    def forward(self, x):
-        identity = x
+        self.bottleneck_res4 = BottleClassifier(1024, self.num_classes, relu=True, dropout=False, bottle_dim=256)
+        self.linear_embeder_res4 = nn.Linear(1024, 256)
 
-        out = self.conv1(x)
-        out = self.bn1(out)
-        out = self.relu(out)
+        self.bottleneck_res5 = BottleClassifier(2048, self.num_classes, relu=True, dropout=False, bottle_dim=256)
+        self.linear_embeder_res5 = nn.Linear(2048, 256)
 
-        out = self.conv2(out)
-        out = self.bn2(out)
-        out = self.relu(out)
+        self.bottleneck_unite = BottleClassifier(3072, self.num_classes, relu=True, dropout=False, bottle_dim=512)
+        self.linear_embeder_unite = nn.Linear(3072, 256)
 
-        out = self.conv3(out)
-        out = self.bn3(out)
+    def forward(self, feature_in1, feature_in2, feature_in3):
+        print('feature_in1, feature_in2, feature_in3', feature_in1.size(), feature_in2.size(), feature_in3.size())
+        # classify head
 
-        out += identity
-        out = self.relu(out)
+        optim1_avg = torch.squeeze(self.averagepool(feature_in1))
+        print('optim1_avg', optim1_avg.size())
+        class_optim1 = self.bottleneck_res4(optim1_avg)
+        print('class_optim1', class_optim1.size())
 
-        return out
+
+        optim2_avg = torch.squeeze(self.averagepool(feature_in2))
+        class_optim2 = self.bottleneck_res5(optim2_avg)
+
+        optim3_avg = torch.squeeze(self.averagepool(feature_in3))
+        class_optim3 =self.bottleneck_unite(optim3_avg)
+
+        #embed head
+        embed_optim1 = self.linear_embeder_res4(optim1_avg)
+        embed_optim2 = self.linear_embeder_res5(optim2_avg)
+        embed_optim3 = self.linear_embeder_unite(optim3_avg)
+
+
+        return class_optim1, class_optim2, class_optim3, embed_optim1, embed_optim2, embed_optim3
+
+
+class PyramidEmbedder(nn.Module):
+    def __init__(self, num_classes):
+        super(PyramidEmbedder, self).__init__()
+
+        self. pyramid_clssifier = PyramidClassifier(num_classes)
+
+    def forward(self, feature_in1, feature_in2, feature_in3):
+
+        class_optim1, class_optim2, class_optim3, embed_optim1, embed_optim2, embed_optim3 = self.pyramid_clssifier(feature_in1, feature_in2, feature_in3)
+        list_class_optim1=[]
+        list_class_optim1.append(class_optim1)
+        list_class_optim2=[]
+        list_class_optim2.append(class_optim2)
+        list_class_optim3=[]
+        list_class_optim3.append(class_optim3)
+        list_embed_optim1=[]
+        list_embed_optim1.append(embed_optim1)
+        list_embed_optim2=[]
+        list_embed_optim2.append(embed_optim2)
+        list_embed_optim3=[]
+        list_embed_optim3.append(embed_optim3)
+
+        return list_class_optim1, list_class_optim2, list_class_optim3, list_embed_optim1, list_embed_optim2, list_embed_optim3
+
+
 
 class FeaturePyramid(nn.Module):
     ''' feature pyramed based on residual blocks'''
-    def __init__(self, num_classes, out_channels):
+    def __init__(self, num_classes):
         super(FeaturePyramid, self).__init__()
 
         backbone = torchvision.models.resnet50(pretrained=True)
-        # self.backbone_layers = list(self.backbone.children())
         self.input_res2_res3 = nn.Sequential(backbone.conv1, backbone.bn1, backbone.relu, backbone.maxpool,
                                          backbone.layer1, backbone.layer2)
         self.res4 = backbone.layer3
         self.res5 = backbone.layer4
-        self.averagepool =nn.AvgPool2d(kernel_size=2,stride=1, ceil_mode=False)
-        self.maxpool= nn.MaxPool2d(kernel_size=2,stride=1, ceil_mode=False)
-        self.bottleneck_res4 = Bottleneck(1024, 512)
-        self.linear_res4 = nn.Linear(1024, num_classes)
-        self.bottleneck_res5 = Bottleneck(2048, 1024)
-        self.linear_res5 = nn.Linear(2048, num_classes)
-        self.bottleneck_unite = Bottleneck(3072, 1536)
-        self.linear_unite = nn.Linear(3072, num_classes)
-
+        self.maxpool= nn.MaxPool2d(kernel_size=3, stride=2, padding=1, dilation=1, ceil_mode=False)
 
     def forward(self, x):
+        # print('x',x.size())
         out = self.input_res2_res3(x)
+        # print('out',out.size())
         res4 = self.res4(out)
+        # print('res4',res4.size())
         res5 = self.res5(res4)
-        optim1 = self.averagepool(res4)
-        optim1 = self.bottleneck_res4(optim1)
-        optim1 = self.linear_res4(optim1)
-        optim2 = self.averagepool(res5)
-        optim2 = self.bottleneck_res5(optim2)
-        optim2 = self.linear_res5(optim2)
+        # print('res5',res5.size())
         res4_d = self.maxpool(res4)
+        # print('4-d',res4_d.size())
         unite = torch.cat((res4_d, res5), dim=1)
-        optim3 = self.averagepool(unite)
-        optim3 = self.bottleneck_unite(optim3)
-
-        return optim1, optim2, optim3
-
+        # print('unite',unite.size())
+        return res4, res5, unite
 
 
 class ResidualBlock(nn.Module):

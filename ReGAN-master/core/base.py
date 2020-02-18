@@ -6,7 +6,7 @@ import torch.nn.functional as F
 import torch.optim as optim
 import itertools
 
-from .model import Generator, Discriminator, ConditionalDiscriminator, weights_init_normal, Encoder, Embeder
+from .model import Generator, Discriminator, ConditionalDiscriminator, weights_init_normal, Encoder, Embeder, FeaturePyramid, PyramidEmbedder
 from tools import *
 
 
@@ -99,8 +99,8 @@ class Base:
 
 
 		## the feature alignment module
-		encoder = Encoder()
-		embeder = Embeder(1, self.class_num)
+		encoder = FeaturePyramid(self.class_num)
+		embeder = PyramidEmbedder(self.class_num)
 		self.encoder = torch.nn.DataParallel(encoder).to(self.device)
 		self.embeder = torch.nn.DataParallel(embeder).to(self.device)
 
@@ -143,8 +143,8 @@ class Base:
 	def _init_criterions(self):
 		# of the pixel alignment module
 		self.criterion_gan_mse = torch.nn.MSELoss()
-		self.criterion_gan_cycle = torch.nn.L1Loss()#pytorch_msssim.MSSSIM()#t
-		self.criterion_gan_identity = torch.nn.L1Loss()#pytorch_msssim.MSSSIM()#
+		self.criterion_gan_cycle = torch.nn.L1Loss()
+		self.criterion_gan_identity = torch.nn.L1Loss()
 		self.ones = torch.ones([self.config.p_gan*self.config.k_gan, 1, 4, 4]).float().to(self.device)
 		self.zeros = torch.zeros([self.config.p_gan*self.config.k_gan, 1, 4, 4]).float().to(self.device)
 

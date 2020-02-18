@@ -26,14 +26,25 @@ def warmup_feature_module_a_step(config, base, loaders):
 		ir_images, ir_pids = ir_images.to(base.device), ir_pids.to(base.device)
 
 		## forward
-		ir_features = base.encoder(base.process_images_4_encoder(ir_images, True, True))
-		_, _, ir_logits_list, ir_embedding_list = base.embeder(ir_features)
+		ir_feature1, ir_feature2, ir_feature3 = base.encoder(base.process_images_4_encoder(ir_images, True, True))
+		class_optim1, class_optim2, class_optim3, embed_optim1, embed_optim2, embed_optim3 = base.embeder(ir_feature1, ir_feature2, ir_feature3)
 
 		## compute losses
 		# classification loss
-		ir_acc, loss_ir_cls = base.compute_classification_loss(ir_logits_list, ir_pids)
+		ir_acc_1, loss_ir_cls_1 = base.compute_classification_loss(class_optim1, ir_pids)
+		ir_acc_2, loss_ir_cls_2 = base.compute_classification_loss(class_optim2, ir_pids)
+		ir_acc_3, loss_ir_cls_3 = base.compute_classification_loss(class_optim3, ir_pids)
+		# print(loss_ir_cls_1, loss_ir_cls_2, loss_ir_cls_3)
+		# print(ir_acc_1, ir_acc_2, ir_acc_3)
+		loss_ir_cls = loss_ir_cls_1 + loss_ir_cls_2 + loss_ir_cls_3
+		ir_acc = (ir_acc_1[0] + ir_acc_2[0] + ir_acc_3[0])/3
 		# triplet loss
-		loss_ir_triplet = base.compute_triplet_loss(ir_embedding_list, ir_embedding_list, ir_embedding_list, ir_pids, ir_pids, ir_pids)
+		loss_ir_triplet_1 = base.compute_triplet_loss(embed_optim1, embed_optim1, embed_optim1, ir_pids, ir_pids, ir_pids)
+		loss_ir_triplet_2 = base.compute_triplet_loss(embed_optim2, embed_optim2, embed_optim2, ir_pids, ir_pids, ir_pids)
+		loss_ir_triplet_3 = base.compute_triplet_loss(embed_optim3, embed_optim3, embed_optim3, ir_pids, ir_pids, ir_pids)
+
+		loss_ir_triplet = loss_ir_triplet_1 + loss_ir_triplet_2 + loss_ir_triplet_3
+
 		loss = loss_ir_cls + loss_ir_triplet
 
 		## optimize
