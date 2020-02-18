@@ -12,6 +12,92 @@ def weights_init_normal(m):
         torch.nn.init.normal_(m.weight.data, 1.0, 0.02)
         torch.nn.init.constant_(m.bias.data, 0.0)
 
+def conv3x3(in_planes, out_planes, stride=1, groups=1, dilation=1):
+    """3x3 convolution with padding"""
+    return nn.Conv2d(in_planes, out_planes, kernel_size=3, stride=stride,
+                     padding=dilation, groups=groups, bias=False, dilation=dilation)
+
+def conv1x1(in_planes, out_planes, stride=1):
+    """1x1 convolution"""
+    return nn.Conv2d(in_planes, out_planes, kernel_size=1, stride=stride, bias=False)
+
+class Bottleneck(nn.Module):
+    expansion = 2
+
+    def __init__(self, inplanes, planes, stride=1, groups=1,
+                 base_width=64, dilation=1, norm_layer=None):
+        super(Bottleneck, self).__init__()
+        if norm_layer is None:
+            norm_layer = nn.BatchNorm2d
+        width = int(planes * (base_width / 64.)) * groups
+        # Both self.conv2 and self.downsample layers downsample the input when stride != 1
+        self.conv1 = conv1x1(inplanes, width)
+        self.bn1 = norm_layer(width)
+        self.conv2 = conv3x3(width, width, stride, groups, dilation)
+        self.bn2 = norm_layer(width)
+        self.conv3 = conv1x1(width, planes * self.expansion)
+        self.bn3 = norm_layer(planes * self.expansion)
+        self.relu = nn.ReLU(inplace=True)
+        self.stride = stride
+
+    def forward(self, x):
+        identity = x
+
+        out = self.conv1(x)
+        out = self.bn1(out)
+        out = self.relu(out)
+
+        out = self.conv2(out)
+        out = self.bn2(out)
+        out = self.relu(out)
+
+        out = self.conv3(out)
+        out = self.bn3(out)
+
+        out += identity
+        out = self.relu(out)
+
+        return out
+
+class FeaturePyramid(nn.Module):
+    ''' feature pyramed based on residual blocks'''
+    def __init__(self, num_classes, out_channels):
+        super(FeaturePyramid, self).__init__()
+
+        backbone = torchvision.models.resnet50(pretrained=True)
+        # self.backbone_layers = list(self.backbone.children())
+        self.input_res2_res3 = nn.Sequential(backbone.conv1, backbone.bn1, backbone.relu, backbone.maxpool,
+                                         backbone.layer1, backbone.layer2)
+        self.res4 = backbone.layer3
+        self.res5 = backbone.layer4
+        self.averagepool =nn.AvgPool2d(kernel_size=2,stride=1, ceil_mode=False)
+        self.maxpool= nn.MaxPool2d(kernel_size=2,stride=1, ceil_mode=False)
+        self.bottleneck_res4 = Bottleneck(1024, 512)
+        self.linear_res4 = nn.Linear(1024, num_classes)
+        self.bottleneck_res5 = Bottleneck(2048, 1024)
+        self.linear_res5 = nn.Linear(2048, num_classes)
+        self.bottleneck_unite = Bottleneck(3072, 1536)
+        self.linear_unite = nn.Linear(3072, num_classes)
+
+
+    def forward(self, x):
+        out = self.input_res2_res3(x)
+        res4 = self.res4(out)
+        res5 = self.res5(res4)
+        optim1 = self.averagepool(res4)
+        optim1 = self.bottleneck_res4(optim1)
+        optim1 = self.linear_res4(optim1)
+        optim2 = self.averagepool(res5)
+        optim2 = self.bottleneck_res5(optim2)
+        optim2 = self.linear_res5(optim2)
+        res4_d = self.maxpool(res4)
+        unite = torch.cat((res4_d, res5), dim=1)
+        optim3 = self.averagepool(unite)
+        optim3 = self.bottleneck_unite(optim3)
+
+        return optim1, optim2, optim3
+
+
 
 class ResidualBlock(nn.Module):
     '''Residual Block with Instance Normalization'''
