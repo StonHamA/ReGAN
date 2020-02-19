@@ -29,36 +29,48 @@ def warmup_feature_module_a_step(config, base, loaders):
 		## forward
 		rgb_feature1, rgb_feature2 = base.encoder_rgb(base.process_images_4_encoder(rgb_images, True, True))
 		ir_feature1, ir_feature2 = base.encoder_ir(base.process_images_4_encoder(ir_images, True, True))
-		class_optim1, class_optim2, class_optim3, embed_optim1, embed_optim2, embed_optim3 = base.embeder(ir_feature1, ir_feature2, rgb_feature1, rgb_feature2)
+		_, class_optim1, class_optim2, class_optim3, embed_optim1, embed_optim2, embed_optim3 = base.embeder(ir_feature1, ir_feature2, rgb_feature1, rgb_feature2)
 
 		## compute losses
+		# rgb_acc_1, loss_rgb_cls_1 = base.compute_classification_loss(class_optim1, rgb_pids)
+		# rgb_acc_2, loss_rgb_cls_2 = base.compute_classification_loss(class_optim2, rgb_pids)
+		# rgb_acc_3, loss_rgb_cls_3 = base.compute_classification_loss(class_optim3, rgb_pids)
+		# # print(loss_ir_cls_1, loss_ir_cls_2, loss_ir_cls_3)
+		# # print(ir_acc_1, ir_acc_2, ir_acc_3)
+		# loss_rgb_cls = (loss_rgb_cls_1 + loss_rgb_cls_2 + loss_rgb_cls_3) / 3
+		# rgb_acc = (rgb_acc_1[0] + rgb_acc_2[0] + rgb_acc_3[0]) / 3
+		# # triplet loss
+		# loss_rgb_triplet = base.compute_triplet_loss(embed_optim3, embed_optim3, embed_optim3, rgb_pids, rgb_pids,
+		# 										 rgb_pids)
+		# loss_rgb = loss_rgb_cls + loss_rgb_triplet
+
+
 		# classification loss
 		ir_acc_1, loss_ir_cls_1 = base.compute_classification_loss(class_optim1, ir_pids)
 		ir_acc_2, loss_ir_cls_2 = base.compute_classification_loss(class_optim2, ir_pids)
 		ir_acc_3, loss_ir_cls_3 = base.compute_classification_loss(class_optim3, ir_pids)
 		# print(loss_ir_cls_1, loss_ir_cls_2, loss_ir_cls_3)
 		# print(ir_acc_1, ir_acc_2, ir_acc_3)
-		loss_ir_cls = loss_ir_cls_1 + loss_ir_cls_2 + loss_ir_cls_3
-		ir_acc = (ir_acc_1[0] + ir_acc_2[0] + ir_acc_3[0])/3
+		loss_ir_cls = (loss_ir_cls_1 + loss_ir_cls_2 + loss_ir_cls_3) / 3
+		ir_acc = (ir_acc_1[0] + ir_acc_2[0] + ir_acc_3[0]) / 3
 		# triplet loss
-		loss_ir_triplet_1 = base.compute_triplet_loss(embed_optim1, embed_optim1, embed_optim1, ir_pids, ir_pids, ir_pids)
-		loss_ir_triplet_2 = base.compute_triplet_loss(embed_optim2, embed_optim2, embed_optim2, ir_pids, ir_pids, ir_pids)
-		loss_ir_triplet_3 = base.compute_triplet_loss(embed_optim3, embed_optim3, embed_optim3, ir_pids, ir_pids, ir_pids)
+		loss_ir_triplet = base.compute_triplet_loss(embed_optim3, embed_optim3, embed_optim3, ir_pids, ir_pids,
+												 ir_pids)
+		loss_ir = loss_ir_cls + loss_ir_triplet
 
-		loss_ir_triplet = loss_ir_triplet_1 + loss_ir_triplet_2 + loss_ir_triplet_3
-
-		loss = loss_ir_cls + loss_ir_triplet
+		loss_all = loss_ir
 
 		## optimize
 		base.ide_optimizer.zero_grad()
-		loss.backward()
+		loss_all.backward()
 		base.ide_optimizer.step()
 
-		# record
-		torch.Tensor([ir_acc[0], loss_ir_cls.data, loss_ir_triplet.data])
-		feature_meter.update(torch.Tensor([ir_acc[0], loss_ir_cls.data, loss_ir_triplet.data]), 1)
 
-	return ['ir_acc', 'loss_ir_cls', 'loss_ir_triplet'], feature_meter.get_val_numpy()
+		# record
+		torch.Tensor([ ir_acc ,loss_ir_cls.data, loss_ir_triplet.data])
+		feature_meter.update(torch.Tensor([ ir_acc, loss_ir_cls.data, loss_ir_triplet.data]), 1)
+
+	return [ 'ir_acc', 'loss_ir_cls', 'loss_ir_triplet'], feature_meter.get_val_numpy()
 
 
 
@@ -91,8 +103,10 @@ def warmup_pixel_module_an_iter(config, base, loaders):
 	fake_ir_images = base.G_rgb2ir(real_rgb_images)
 
 	## features
-	real_ir_features = base.encoder(base.process_images_4_encoder(real_ir_images, True, True))
-	fake_ir_features = base.encoder(base.process_images_4_encoder(fake_ir_images, True, True))
+	real_ir_features1, real_ir_features2 = base.encoder_ir(base.process_images_4_encoder(real_ir_images, True, True))
+	fake_ir_features1, fake_ir_features2 = base.encoder_ir(base.process_images_4_encoder(fake_ir_images, True, True))
+	real_rgb_features1, real_rgb_features2 = base.encoder_rgb(base.process_images_4_encoder(real_rgb_images, True, True))
+	fake_rgb_features1, fake_rgb_features2 = base.encoder_rgb(base.process_images_4_encoder(real_rgb_images, True, True))
 
 	#########################################################################################################
 	#                                                     Generator                                         #
@@ -115,8 +129,9 @@ def warmup_pixel_module_an_iter(config, base, loaders):
 	identity_loss = (identity_loss_rgb + identity_loss_ir) / 2.0
 
 	## task related loss
-	_, _, _, real_ir_embedding_list = base.embeder(real_ir_features)
-	_, _, fake_ir_logit_list, fake_ir_embedding_list = base.embeder(fake_ir_features)
+	_, _, _, _,_,_,real_ir_embedding_list = base.embeder(real_ir_features1, real_ir_features2, fake_rgb_features1, fake_rgb_features2 )
+	_, _, _,fake_ir_logit_list,_,_,fake_ir_embedding_list = base.embeder(fake_ir_features1, fake_ir_features2, real_rgb_features1, real_rgb_features2)
+
 
 
 	tri_loss_1 = base.compute_triplet_loss(fake_ir_embedding_list, real_ir_embedding_list,

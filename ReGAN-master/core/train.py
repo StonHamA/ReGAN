@@ -42,15 +42,17 @@ def train_pixel_module_a_iter(config, base, loaders):
 	fake_ir_images = base.G_rgb2ir(real_rgb_images)
 
 	## features
-	real_ir_features = base.encoder(base.process_images_4_encoder(real_ir_images, True, True))
-	fake_ir_features = base.encoder(base.process_images_4_encoder(fake_ir_images, True, True))
+	real_ir_features1, real_ir_features2 = base.encoder_ir(base.process_images_4_encoder(real_ir_images, True, True))
+	fake_ir_features1, fake_ir_features2 = base.encoder_ir(base.process_images_4_encoder(fake_ir_images, True, True))
+	real_rgb_features1, real_rgb_features2 = base.encoder_rgb(base.process_images_4_encoder(real_rgb_images, True, True))
+	fake_rgb_features1, fake_rgb_features2 = base.encoder_rgb(base.process_images_4_encoder(real_rgb_images, True, True))
 
 	#########################################################################################################
 	#                                                     Generator                                         #
 	#########################################################################################################
 	# gan loss
 	gan_loss_rgb = base.criterion_gan_mse(base.D_rgb(fake_rgb_images), base.ones)
-	gan_loss_ir = base.criterion_gan_mse(base.D_ir(fake_ir_images, real_ir_features.detach()), base.ones)
+	gan_loss_ir = base.criterion_gan_mse(base.D_ir(fake_ir_images, real_ir_features2.detach()), base.ones)
 
 	gan_loss = (gan_loss_rgb + gan_loss_ir) / 2.0
 
@@ -67,8 +69,9 @@ def train_pixel_module_a_iter(config, base, loaders):
 	## task related loss
 	if base.lambda_pixel_tri != 0 or base.lambda_pixel_cls != 0:
 
-		_, _, _, real_ir_embedding_list = base.embeder(real_ir_features)
-		_, _, fake_ir_logit_list, fake_ir_embedding_list = base.embeder(fake_ir_features)
+		_, _, _, _, _, _, real_ir_embedding_list = base.embeder(real_ir_features1, real_ir_features2, fake_rgb_features1, fake_rgb_features2)
+		_, _, _, fake_ir_logit_list, _, _, fake_ir_embedding_list = base.embeder(fake_ir_features1, fake_ir_features2, real_rgb_features1, real_rgb_features2)
+
 		tri_loss_1 = base.compute_triplet_loss(fake_ir_embedding_list, real_ir_embedding_list,
 		                                       real_ir_embedding_list, rgb_pids, ir_pids, ir_pids)
 		tri_loss_2 = base.compute_triplet_loss(real_ir_embedding_list, fake_ir_embedding_list,
@@ -102,13 +105,13 @@ def train_pixel_module_a_iter(config, base, loaders):
 	base.D_rgb_optimizer.step()
 
 	# discriminator ir
-	gan_loss_ir_real = base.criterion_gan_mse(base.D_ir(real_ir_images, real_ir_features.detach()), base.ones)
+	gan_loss_ir_real = base.criterion_gan_mse(base.D_ir(real_ir_images, real_ir_features2.detach()), base.ones)
 
 	wrong_real_ir_images, _ = base.generate_wrong_images(real_ir_images, ir_pids)
-	gan_loss_ir_fake_1 = base.criterion_gan_mse(base.D_ir(wrong_real_ir_images, real_ir_features.detach()), base.zeros)
-	gan_loss_ir_fake_2 = base.criterion_gan_mse(base.D_ir(real_ir_images, fake_ir_features.detach()), base.zeros)
-	gan_loss_ir_fake_3 = base.criterion_gan_mse(base.D_ir(fake_ir_images.detach(), real_ir_features.detach()), base.zeros)
-	gan_loss_ir_fake_4 = base.criterion_gan_mse(base.D_ir(fake_ir_images.detach(), fake_ir_features.detach()), base.zeros)
+	gan_loss_ir_fake_1 = base.criterion_gan_mse(base.D_ir(wrong_real_ir_images, real_ir_features2.detach()), base.zeros)
+	gan_loss_ir_fake_2 = base.criterion_gan_mse(base.D_ir(real_ir_images, fake_ir_features2.detach()), base.zeros)
+	gan_loss_ir_fake_3 = base.criterion_gan_mse(base.D_ir(fake_ir_images.detach(), real_ir_features2.detach()), base.zeros)
+	gan_loss_ir_fake_4 = base.criterion_gan_mse(base.D_ir(fake_ir_images.detach(), real_ir_features2.detach()), base.zeros)
 
 	gan_loss_ir_fake = (gan_loss_ir_fake_1 + gan_loss_ir_fake_2 + gan_loss_ir_fake_3 + gan_loss_ir_fake_4) / 4.0
 
@@ -134,32 +137,48 @@ def train_feature_module_a_iter(config, base, loaders):
 	## forward
 	with torch.no_grad():
 		fake_ir_images = base.G_rgb2ir(real_rgb_images).detach()
-	fake_ir_feature1, fake_ir_feature2, fake_ir_feature3 = base.encoder(base.process_images_4_encoder(fake_ir_images, True, True))
-	real_ir_feature1, real_ir_feature2, real_ir_feature3 = base.encoder(base.process_images_4_encoder(real_ir_images, True, True))
+		fake_rgb_images = base.G_ir2rgb(real_ir_images).detach()
+	fake_ir_feature1, fake_ir_feature2 = base.encoder_ir(base.process_images_4_encoder(fake_ir_images, True, True))
+	real_ir_feature1, real_ir_feature2 = base.encoder_ir(base.process_images_4_encoder(real_ir_images, True, True))
 
-	fake_ir_logits_list, fake_ir_embedding_list = base.embeder(fake_ir_feature1, fake_ir_feature2, fake_ir_feature3)
-	real_ir_logits_list, real_ir_embedding_list = base.embeder(real_ir_feature1, real_ir_feature2, real_ir_feature3)
+	fake_rgb_feature1,fake_rgb_feature2 = base.encoder_rgb(base.process_images_4_encoder(fake_rgb_images, True, True))
+	real_rgb_feature1,real_rgb_feature2 = base.encoder_rgb(base.process_images_4_encoder(real_rgb_images, True, True))
+
+	_,fake_ir_class_optim1, fake_ir_class_optim2, fake_ir_class_optim3, fake_ir_embed_optim1, fake_ir_embed_optim2, fake_ir_embed_optim3 = base.embeder(fake_ir_feature1, fake_ir_feature2, real_rgb_feature1,real_rgb_feature2)
+	_,real_ir_class_optim1, real_ir_class_optim2, real_ir_class_optim3, real_ir_embed_optim1, real_ir_embed_optim2, real_ir_embed_optim3 = base.embeder(real_ir_feature1, real_ir_feature2, fake_rgb_feature1,fake_rgb_feature2)
 
 	## compute losses
 	# classification loss
-	ir_pids = torch.cat((ir_pids, ir_pids, ir_pids), dim=1)
-	rgb_pids = torch.cat((rgb_pids, rgb_pids, rgb_pids), dim=1)
 
-	fake_ir_acc, loss_fake_ir_cls = base.compute_classification_loss(fake_ir_logits_list, rgb_pids)
-	real_ir_acc, loss_real_ir_cls = base.compute_classification_loss(real_ir_logits_list, ir_pids)
+	fake_ir_acc1, loss_fake_ir_cls_1 = base.compute_classification_loss(fake_ir_class_optim1, rgb_pids)
+	fake_ir_acc2, loss_fake_ir_cls_2 = base.compute_classification_loss(fake_ir_class_optim2, rgb_pids)
+	fake_ir_acc3, loss_fake_ir_cls_3 = base.compute_classification_loss(fake_ir_class_optim3, rgb_pids)
+
+	real_ir_acc1, loss_real_ir_cls_1 = base.compute_classification_loss(real_ir_class_optim1, ir_pids)
+	real_ir_acc2, loss_real_ir_cls_2 = base.compute_classification_loss(real_ir_class_optim2, ir_pids)
+	real_ir_acc3, loss_real_ir_cls_3 = base.compute_classification_loss(real_ir_class_optim3, ir_pids)
+
+	loss_fake_ir_cls = loss_fake_ir_cls_1 + loss_fake_ir_cls_2 + loss_fake_ir_cls_3
+	loss_real_ir_cls = loss_real_ir_cls_1 + loss_real_ir_cls_2 + loss_real_ir_cls_3
 	loss_cls = loss_fake_ir_cls + loss_real_ir_cls
+
+	fake_ir_acc = (fake_ir_acc1[0] + fake_ir_acc2[0] + fake_ir_acc3[0]) / 3
+	real_ir_acc = (real_ir_acc1[0] + real_ir_acc2[0] + real_ir_acc3[0]) / 3
+
 	# triplet loss
-	loss_ir2rgb_triplet = base.compute_triplet_loss(fake_ir_embedding_list, real_ir_embedding_list,
-	                                                real_ir_embedding_list, rgb_pids, ir_pids, ir_pids)
-	loss_rgb2ir_triplet = base.compute_triplet_loss(real_ir_embedding_list, fake_ir_embedding_list,
-	                                                fake_ir_embedding_list, ir_pids, rgb_pids, rgb_pids)
+
+	loss_ir2rgb_triplet = base.compute_triplet_loss(fake_ir_embed_optim3, real_ir_embed_optim3,
+	                                                real_ir_embed_optim3, rgb_pids, ir_pids, ir_pids)
+
+	loss_rgb2ir_triplet = base.compute_triplet_loss(real_ir_embed_optim3, fake_ir_embed_optim3,
+	                                                fake_ir_embed_optim3, ir_pids, rgb_pids, rgb_pids)
 	loss_triplet = loss_ir2rgb_triplet + loss_rgb2ir_triplet
 
 	# centr
 
 	# gan loss
 	if base.lambda_feature_gan != 0.0:
-		logits = base.D_ir(real_ir_images, fake_ir_features)
+		logits = base.D_ir(real_ir_images, fake_ir_feature2)
 		loss_gan = base.criterion_gan_mse(logits, torch.ones_like(logits))
 	else:
 		loss_gan = torch.Tensor([0.0]).to(base.device)

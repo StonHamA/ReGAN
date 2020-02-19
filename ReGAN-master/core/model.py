@@ -80,7 +80,7 @@ class PyramidClassifier(nn.Module):
         embed_optim3 = self.linear_embeder_unite(optim3_avg)
 
 
-        return class_optim1, class_optim2, class_optim3, embed_optim1, embed_optim2, embed_optim3
+        return fusion_feature3, class_optim1, class_optim2, class_optim3, embed_optim1, embed_optim2, embed_optim3
 
 
 class PyramidEmbedder(nn.Module):
@@ -91,7 +91,7 @@ class PyramidEmbedder(nn.Module):
 
     def forward(self, feature_in1_1, feature_in1_2, feature_in2_1, feature_in2_2):
 
-        class_optim1, class_optim2, class_optim3, embed_optim1, embed_optim2, embed_optim3= self.pyramid_clssifier(feature_in1_1, feature_in1_2, feature_in2_1, feature_in2_2)
+        fusion_feature3, class_optim1, class_optim2, class_optim3, embed_optim1, embed_optim2, embed_optim3= self.pyramid_clssifier(feature_in1_1, feature_in1_2, feature_in2_1, feature_in2_2)
         list_class_optim1=[]
         list_class_optim1.append(class_optim1)
         list_class_optim2=[]
@@ -105,7 +105,7 @@ class PyramidEmbedder(nn.Module):
         list_embed_optim3=[]
         list_embed_optim3.append(embed_optim3)
 
-        return list_class_optim1, list_class_optim2, list_class_optim3, list_embed_optim1, list_embed_optim2, list_embed_optim3
+        return fusion_feature3,list_class_optim1, list_class_optim2, list_class_optim3, list_embed_optim1, list_embed_optim2, list_embed_optim3
 
 
 

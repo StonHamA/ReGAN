@@ -37,10 +37,12 @@ def compute_and_save_features(base, loaders):
 		images_f = fliplr(images)
 		images = images.to(base.device)
 		images_f = images_f.to(base.device)
-		features = base.encoder(base.process_images_4_encoder(images, True, True))
-		features_f = base.encoder(base.process_images_4_encoder(images_f, True, True))
-		features, _, _, _ = base.embeder(features)
-		features_f, _, _, _ = base.embeder(features_f)
+		features_rgb1, features_rgb2 = base.encoder_rgb(base.process_images_4_encoder(images, True, True))
+		features_rgb_f1, features_rgb_f2 = base.encoder_rgb(base.process_images_4_encoder(images_f, True, True))
+		features_ir1, features_ir2 = base.encoder_ir(base.process_images_4_encoder(images, True, True))
+		features_ir_f1, features_ir_f2 = base.encoder_ir(base.process_images_4_encoder(images_f, True, True))
+		features,   _,_,_, _, _, _ = base.embeder(features_ir1, features_ir2, features_rgb1, features_rgb2)
+		features_f, _,_,_, _, _, _ = base.embeder(features_ir_f1, features_ir_f2, features_rgb_f1, features_rgb_f2 )
 		features = features + features_f
 		if base.part_num == 1:
 			features = torch.unsqueeze(features, -1)
@@ -131,6 +133,7 @@ def save_images(base, current_step):
 	#base.set_eval()
 	with torch.no_grad():
 		fixed_fake_ir_images = base.G_rgb2ir(base.fixed_real_rgb_images).detach()
-		xxxx = torch.cat([base.fixed_real_rgb_images, fixed_fake_ir_images, base.fixed_real_ir_images], dim=0)
+		fixed_fake_rgb_images = base.G_ir2rgb(base.fixed_real_ir_images).detach()
+		xxxx = torch.cat([base.fixed_real_rgb_images, fixed_fake_ir_images, fixed_fake_rgb_images, base.fixed_real_ir_images], dim=0)
 		save_image((xxxx.data.cpu() + 1.0) / 2.0,
 		           os.path.join(base.save_images_path, 'image_{}.jpg'.format(current_step)), nrow=base.fixed_real_rgb_images.size(0), padding=0)
