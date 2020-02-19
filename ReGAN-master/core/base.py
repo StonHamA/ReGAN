@@ -99,9 +99,11 @@ class Base:
 
 
 		## the feature alignment module
-		encoder = FeaturePyramid(self.class_num)
+		encoder_1 = FeaturePyramid(self.class_num)
+		encoder_2 = FeaturePyramid(self.class_num)
 		embeder = PyramidEmbedder(self.class_num)
-		self.encoder = torch.nn.DataParallel(encoder).to(self.device)
+		self.encoder_ir = torch.nn.DataParallel(encoder_1).to(self.device)
+		self.encoder_rgb = torch.nn.DataParallel(encoder_2).to(self.device)
 		self.embeder = torch.nn.DataParallel(embeder).to(self.device)
 
 		## Restore the pixel alignment module, if the pre-trained model is existed
@@ -135,7 +137,8 @@ class Base:
 		self.model_list.append(self.D_ir)
 		self.model_list.append(self.D_rgb_warmup)
 		self.model_list.append(self.D_ir_warmup)
-		self.model_list.append(self.encoder)
+		self.model_list.append(self.encoder_ir)
+		self.model_list.append(self.encoder_rgb)
 		self.model_list.append(self.embeder)
 
 
@@ -188,7 +191,8 @@ class Base:
 		self.D_ir_lr_decay = optim.lr_scheduler.MultiStepLR(self.D_ir_optimizer, self.milestones, gamma=0.1)
 
 		## of the feature alignment module
-		params = [{'params': self.encoder.parameters(), 'lr': 0.1 * self.base_feature_ide_learning_rate},
+		params = [{'params': self.encoder_ir.parameters(), 'lr': 0.1 * self.base_feature_ide_learning_rate},
+				  {'params': self.encoder_rgb.parameters(), 'lr': 0.1 * self.base_feature_ide_learning_rate},
 				  {'params': self.embeder.parameters(), 'lr': self.base_feature_ide_learning_rate}]
 		self.ide_optimizer = optim.SGD(params=params, weight_decay=5e-4, momentum=0.9, nesterov=True)
 		self.ide_lr_scheduler = optim.lr_scheduler.MultiStepLR(self.ide_optimizer, self.milestones, gamma=0.1)

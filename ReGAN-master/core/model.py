@@ -26,6 +26,12 @@ class PyramidClassifier(nn.Module):
     def __init__(self, num_classes):
         super(PyramidClassifier,self).__init__()
         self.num_classes = num_classes
+        self.maxpool2D = nn.MaxPool2d(kernel_size=3, stride=2, padding=1, dilation=1, ceil_mode=False)
+        self.avgpool2D = nn.AvgPool2d(kernel_size=3, stride=2, padding=1, ceil_mode=False)
+
+        self.maxpool3D = nn.MaxPool3d(kernel_size=(1,1,2), stride=0, ceil_mode=False)
+        self.averagepool3D = nn.AvgPool3d(kernel_size=(1,1,2), stride=0,ceil_mode=False)
+
         self.averagepool= nn.AdaptiveAvgPool2d(output_size=(1,1))
 
         self.bottleneck_res4 = BottleClassifier(1024, self.num_classes, relu=True, dropout=False, bottle_dim=256)
@@ -37,20 +43,35 @@ class PyramidClassifier(nn.Module):
         self.bottleneck_unite = BottleClassifier(3072, self.num_classes, relu=True, dropout=False, bottle_dim=512)
         self.linear_embeder_unite = nn.Linear(3072, 256)
 
-    def forward(self, feature_in1, feature_in2, feature_in3):
-        print('feature_in1, feature_in2, feature_in3', feature_in1.size(), feature_in2.size(), feature_in3.size())
-        # classify head
+    def forward(self, feature_in1_1, feature_in1_2, feature_in2_1, feature_in2_2):
+        # print('feature_in1, feature_in2, feature_in3', feature_in1.size(), feature_in2.size(), feature_in3.size())
+        # fuse head
+        fusion_feature1 = torch.stack((feature_in1_1,feature_in2_1), dim=-1)
+        # print('feature1',fusion_feature1.size())
+        fusion_feature1 = torch.squeeze(self.maxpool3D(fusion_feature1))
+        # print('feature1_maxp',fusion_feature1.size())
+        optim1_avg = torch.squeeze(self.averagepool(fusion_feature1))
 
-        optim1_avg = torch.squeeze(self.averagepool(feature_in1))
-        print('optim1_avg', optim1_avg.size())
+        fusion_feature2 = torch.stack((feature_in1_2,feature_in2_2), dim=-1)
+        fusion_feature2 = torch.squeeze(self.maxpool3D(fusion_feature2))
+        # print('feature2_maxp',fusion_feature2.size())
+        optim2_avg = torch.squeeze(self.averagepool(fusion_feature2))
+
+
+        fusion_feature3 = torch.cat((self.avgpool2D(fusion_feature1), fusion_feature2), dim=1)
+        # print('feature3',fusion_feature3.size())
+        optim3_avg = torch.squeeze(self.averagepool(fusion_feature3))
+
+        # optim1_avg = torch.squeeze(self.averagepool(feature_in1))
+        # # print('optim1_avg', optim1_avg.size())
         class_optim1 = self.bottleneck_res4(optim1_avg)
-        print('class_optim1', class_optim1.size())
+        # print('class_optim1', class_optim1.size())
 
 
-        optim2_avg = torch.squeeze(self.averagepool(feature_in2))
+        # optim2_avg = torch.squeeze(self.averagepool(feature_in2))
         class_optim2 = self.bottleneck_res5(optim2_avg)
 
-        optim3_avg = torch.squeeze(self.averagepool(feature_in3))
+        # optim3_avg = torch.squeeze(self.averagepool(feature_in3))
         class_optim3 =self.bottleneck_unite(optim3_avg)
 
         #embed head
@@ -68,9 +89,9 @@ class PyramidEmbedder(nn.Module):
 
         self. pyramid_clssifier = PyramidClassifier(num_classes)
 
-    def forward(self, feature_in1, feature_in2, feature_in3):
+    def forward(self, feature_in1_1, feature_in1_2, feature_in2_1, feature_in2_2):
 
-        class_optim1, class_optim2, class_optim3, embed_optim1, embed_optim2, embed_optim3 = self.pyramid_clssifier(feature_in1, feature_in2, feature_in3)
+        class_optim1, class_optim2, class_optim3, embed_optim1, embed_optim2, embed_optim3= self.pyramid_clssifier(feature_in1_1, feature_in1_2, feature_in2_1, feature_in2_2)
         list_class_optim1=[]
         list_class_optim1.append(class_optim1)
         list_class_optim2=[]
@@ -108,11 +129,11 @@ class FeaturePyramid(nn.Module):
         # print('res4',res4.size())
         res5 = self.res5(res4)
         # print('res5',res5.size())
-        res4_d = self.maxpool(res4)
+        # res4_d = self.maxpool(res4)
         # print('4-d',res4_d.size())
-        unite = torch.cat((res4_d, res5), dim=1)
+        # unite = torch.cat((res4_d, res5), dim=1)
         # print('unite',unite.size())
-        return res4, res5, unite
+        return res4, res5
 
 
 class ResidualBlock(nn.Module):

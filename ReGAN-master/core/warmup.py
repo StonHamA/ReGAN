@@ -21,13 +21,15 @@ def warmup_feature_module_a_step(config, base, loaders):
 	for _ in range(100):
 
 		## load ir data
-		_, _, _, _ = loaders.rgb_train_iter_ide.next_one()
+		rgb_images, rgb_pids, _, _ = loaders.rgb_train_iter_ide.next_one()
+		rgb_images, rgb_pids = rgb_images.to(base.device), rgb_pids.to(base.device)
 		ir_images, ir_pids, _, _ = loaders.ir_train_iter_ide.next_one()
 		ir_images, ir_pids = ir_images.to(base.device), ir_pids.to(base.device)
 
 		## forward
-		ir_feature1, ir_feature2, ir_feature3 = base.encoder(base.process_images_4_encoder(ir_images, True, True))
-		class_optim1, class_optim2, class_optim3, embed_optim1, embed_optim2, embed_optim3 = base.embeder(ir_feature1, ir_feature2, ir_feature3)
+		rgb_feature1, rgb_feature2 = base.encoder_rgb(base.process_images_4_encoder(rgb_images, True, True))
+		ir_feature1, ir_feature2 = base.encoder_ir(base.process_images_4_encoder(ir_images, True, True))
+		class_optim1, class_optim2, class_optim3, embed_optim1, embed_optim2, embed_optim3 = base.embeder(ir_feature1, ir_feature2, rgb_feature1, rgb_feature2)
 
 		## compute losses
 		# classification loss
