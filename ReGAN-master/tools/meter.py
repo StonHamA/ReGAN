@@ -70,7 +70,9 @@ class CatMeter:
         if self.val is None:
             self.val = val
         else:
-            self.val = torch.cat([self.val, val], dim=0)
+            print('flag')
+            self.val = torch.cat((self.val, val), dim=0)
+            print(self.val.size())
     def get_val(self):
         return self.val
 

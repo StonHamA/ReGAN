@@ -25,8 +25,8 @@ def evalutate(config, base, brief=False):
 			print(number_shot)
 			cmc, map = evaluate_sysymm01(base.save_features_path, mode, number_shot)
 			results['{},{}'.format(mode, number_shot)] = [cmc, map]
-			# if brief: break
-		# if brief: break
+			if brief: break
+		if brief: break
 
 	return results
 
@@ -41,6 +41,7 @@ def compute_and_save_features(base, loaders):
 		features_rgb_f1, features_rgb_f2 = base.encoder_rgb(base.process_images_4_encoder(images_f, True, True))
 		features_ir1, features_ir2 = base.encoder_ir(base.process_images_4_encoder(images, True, True))
 		features_ir_f1, features_ir_f2 = base.encoder_ir(base.process_images_4_encoder(images_f, True, True))
+
 		features,   _,_,_, _, _, _ = base.embeder(features_ir1, features_ir2, features_rgb1, features_rgb2)
 		features_f, _,_,_, _, _, _ = base.embeder(features_ir_f1, features_ir_f2, features_rgb_f1, features_rgb_f2 )
 		features = features + features_f
@@ -51,7 +52,9 @@ def compute_and_save_features(base, loaders):
 	def normalize_and_resize_feature(features):
 		# normlize
 		norm = torch.norm(features, dim=1, keepdim=True)
-		features = features / norm.repeat([1, features.size(1), 1])
+		print(norm.size())
+		print(features.size(),features.size(0), features.size(1))
+		features = features /  norm.repeat(1,features.size(1),1)#norm.repeat([1, features.size(1), 1])
 		# resize
 		features = features.view(features.size(0), -1)
 		return features
@@ -84,10 +87,14 @@ def compute_and_save_features(base, loaders):
 			images = base.G_rgb2ir(images.to(base.device)).data.cpu()
 			# forward
 			features = compute_features(images)
+			print('compute', i)
 			# meter
 			features_meter.update(features.data)
+			print('feature', i)
 			pids_meter.update(pids.data)
+			print('pid', i)
 			cids_meter.update(cids.data)
+			print('cid, i', i)
 
 		for i, data in enumerate(loaders.ir_all_loader):
 			# load data
@@ -98,6 +105,8 @@ def compute_and_save_features(base, loaders):
 			features_meter.update(features.data)
 			pids_meter.update(pids.data)
 			cids_meter.update(cids.data)
+			print('e2, i', i)
+
 
 	print('Time:{}.  Start to normalize features.'.format(time_now()))
 	# normalize features

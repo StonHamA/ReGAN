@@ -147,8 +147,8 @@ if __name__ == '__main__':
 	# dataset configuration
 	parser.add_argument('--dataset_path', type=str, default='SYSU-MM01/')
 	parser.add_argument('--p_gan', type=int, default=4, help='person numbers for pixel alignment module')
-	parser.add_argument('--k_gan', type=int, default=2, help='images numbers of a person for pixel alignment module')
-	parser.add_argument('--p_ide', type=int, default=6,   help='person numbers for feature alignment module')
+	parser.add_argument('--k_gan', type=int, default=4, help='images numbers of a person for pixel alignment module')
+	parser.add_argument('--p_ide', type=int, default=16,   help='person numbers for feature alignment module')
 	parser.add_argument('--k_ide', type=int, default=4, help='image numbers of a person for feature alignment module')
 	parser.add_argument('--class_num', type=int, default=395, help='identity numbers in training set')
 	parser.add_argument('--image_size', type=int, default=128, help='image size for pixel alignment module,. in feature alignment module, images will be automatically reshaped to 384*192')
@@ -177,9 +177,9 @@ if __name__ == '__main__':
 	parser.add_argument('--base_feature_ide_learning_rate', type=float, default=0.2, help='learning rate for feature alignment module')
 
 	# training configuration
-	parser.add_argument('--warmup_feature_module_steps', type=int, default=0)#50)
-	parser.add_argument('--warmup_pixel_module_steps', type=int, default=0)#150)
-	parser.add_argument('--joint_training_steps', type=int, default=121)#151)
+	parser.add_argument('--warmup_feature_module_steps', type=int, default=20)#50)
+	parser.add_argument('--warmup_pixel_module_steps', type=int, default=150)#150)
+	parser.add_argument('--joint_training_steps', type=int, default=81)#151)
 	parser.add_argument('--milestones', nargs='+', type=int, default=[50])
 	parser.add_argument('--save_model_steps', nargs='+', type=int, default=[100])
 

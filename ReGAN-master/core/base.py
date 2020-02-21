@@ -221,7 +221,7 @@ class Base:
 			images = images.to(self.device)
 
 		# resize to [384, 192] for ide input
-		images = F.interpolate(images, [384, 192], mode='bilinear')
+		images = F.interpolate(images, [192, 96], mode='bilinear')
 
 		# normalize to [0, 1]
 		images = (images + 1.0) / 2.0

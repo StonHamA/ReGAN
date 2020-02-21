@@ -58,7 +58,11 @@ class PyramidClassifier(nn.Module):
         optim2_avg = torch.squeeze(self.averagepool(fusion_feature2))
 
 
-        fusion_feature3 = torch.cat((self.avgpool2D(fusion_feature1), fusion_feature2), dim=1)
+        if len(fusion_feature2.size()) > 3:
+            fusion_feature3 = torch.cat((self.avgpool2D(fusion_feature1), fusion_feature2), dim=1)
+        else:
+            fusion_feature3 = torch.cat((self.avgpool2D(fusion_feature1), fusion_feature2), dim=0)
+
         # print('feature3',fusion_feature3.size())
         optim3_avg = torch.squeeze(self.averagepool(fusion_feature3))
 
@@ -80,7 +84,7 @@ class PyramidClassifier(nn.Module):
         embed_optim3 = self.linear_embeder_unite(optim3_avg)
 
 
-        return fusion_feature3, class_optim1, class_optim2, class_optim3, embed_optim1, embed_optim2, embed_optim3
+        return optim3_avg, class_optim1, class_optim2, class_optim3, embed_optim1, embed_optim2, embed_optim3
 
 
 class PyramidEmbedder(nn.Module):
